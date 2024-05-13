@@ -1,23 +1,35 @@
-import logo from './logo.svg';
-import './App.css';
+import CustomAppBar from "./Components/CustomAppBar";
+import "./App.css";
+import UploadPage from "./Pages/UploadPage";
+import LandingPage from "./Pages/LandingPage";
+import SearchPage from "./Pages/SearchPage";
+import About from "./Pages/About";
+import { useState } from "react";
 
 function App() {
+  const [page, setPage] = useState(1);
+
+  function RenderPage() {
+    if (page === 1) {
+      return <LandingPage />;
+    }
+    if (page === 2) {
+      return <SearchPage />;
+    }
+    if (page === 3) {
+      return <About />;
+    }
+    if (page === 4) {
+      return <UploadPage />;
+    }
+
+    console.log(page);
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div class="bg-background text-white h-screen w-screen overflow-x-clip">
+      <CustomAppBar setPage={setPage}> </CustomAppBar>
+      <RenderPage />
     </div>
   );
 }

@@ -1,126 +1,80 @@
-const {
-  time,
-  loadFixture,
-} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 const { expect } = require("chai");
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-describe("Lock", function () {
-  // We define a fixture to reuse the same setup in every test.
-  // We use loadFixture to run this setup once, snapshot that state,
-  // and reset Hardhat Network to that snapshot in every test.
-  async function deployOneYearLockFixture() {
-    const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-    const ONE_GWEI = 1_000_000_000;
+describe("Data contract", function () {
+  it("User should be able to upload their data", async function () {
+    const [owner] = await ethers.getSigners();
 
-    const lockedAmount = ONE_GWEI;
-    const unlockTime = (await time.latest()) + ONE_YEAR_IN_SECS;
+    const DataStorage = await ethers.deployContract("DataStorage");
 
-    // Contracts are deployed using the first signer/account by default
-    const [owner, otherAccount] = await ethers.getSigners();
+    await DataStorage.uploadData.getData("BBFkubr38b@$F", "Gene Data", "10");
 
-    const Lock = await ethers.getContractFactory("Lock");
-    const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+    let data = DataStorage.getData();
 
-    return { lock, unlockTime, lockedAmount, owner, otherAccount };
-  }
+    console.log(data);
 
-  describe("Deployment", function () {
-    it("Should set the right unlockTime", async function () {
-      const { lock, unlockTime } = await loadFixture(deployOneYearLockFixture);
-
-      expect(await lock.unlockTime()).to.equal(unlockTime);
-    });
-
-    it("Should set the right owner", async function () {
-      const { lock, owner } = await loadFixture(deployOneYearLockFixture);
-
-      expect(await lock.owner()).to.equal(owner.address);
-    });
-
-    it("Should receive and store the funds to lock", async function () {
-      const { lock, lockedAmount } = await loadFixture(
-        deployOneYearLockFixture
-      );
-
-      expect(await ethers.provider.getBalance(lock.target)).to.equal(
-        lockedAmount
-      );
-    });
-
-    it("Should fail if the unlockTime is not in the future", async function () {
-      // We don't use the fixture here because we want a different deployment
-      const latestTime = await time.latest();
-      const Lock = await ethers.getContractFactory("Lock");
-      await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-        "Unlock time should be in the future"
-      );
-    });
+    expect(1 && (data = ["BBFkubr38b@$F", "Gene Data", "10"]));
   });
+});
 
-  describe("Withdrawals", function () {
-    describe("Validations", function () {
-      it("Should revert with the right error if called too soon", async function () {
-        const { lock } = await loadFixture(deployOneYearLockFixture);
+describe("Data Contract", function () {
+  it("User should be able to retract their data", async function () {
+    const [owner] = await ethers.getSigners();
 
-        await expect(lock.withdraw()).to.be.revertedWith(
-          "You can't withdraw yet"
-        );
-      });
+    const DataStorage = await ethers.deployContract("DataStorage");
 
-      it("Should revert with the right error if called from another account", async function () {
-        const { lock, unlockTime, otherAccount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+    await DataStorage.retractData();
 
-        // We can increase the time in Hardhat Network
-        await time.increaseTo(unlockTime);
+    let data = DataStorage.getData();
 
-        // We use lock.connect() to send a transaction from another account
-        await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-          "You aren't the owner"
-        );
-      });
+    console.log(data);
 
-      it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-        const { lock, unlockTime } = await loadFixture(
-          deployOneYearLockFixture
-        );
+    expect(1 && !data.includes[("BBFkubr38b@$F", "Gene Data", "10")]);
+  });
+});
 
-        // Transactions are sent using the first signer by default
-        await time.increaseTo(unlockTime);
+describe("Data Contract", function () {
+  it("researcher msut be able to view the data", async function () {
+    const [owner] = await ethers.getSigners();
 
-        await expect(lock.withdraw()).not.to.be.reverted;
-      });
+    const WFCoin = await ethers.deployContract("WFCoin", [10 ** 3]);
+    const DutchAuction = await ethers.deployContract("DutchAuction", [
+      (10 ** 15 - 10 ** 14) / (20 * 60),
+      10 ** 15,
+      WFCoin.target,
+    ]);
+
+    const tokenBalance = await DutchAuction.getTokenBalance();
+
+    expect(tokenBalance).to.equal(1000);
+  });
+});
+
+describe("DutchAuction Committing eth", function () {
+  it("Calling the buy() function at the start with 0.1 eth should buy 100 tokens ", async function () {
+    //original token balance : 1000
+    // start Price : 10**15 per token (decreases over time)
+    // sending 0.1 eth at the start should buy  100 tokens
+    const [owner] = await ethers.getSigners();
+
+    const WFCoin = await ethers.deployContract("WFCoin", [10 ** 3]);
+    const DutchAuction = await ethers.deployContract("DutchAuction", [
+      (10 ** 15 - 10 ** 14) / (20 * 60),
+      10 ** 15,
+      WFCoin.target,
+    ]);
+
+    const transactionResponse = await DutchAuction.buy({
+      value: ethers.parseEther("0.1"),
     });
 
-    describe("Events", function () {
-      it("Should emit an event on withdrawals", async function () {
-        const { lock, unlockTime, lockedAmount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+    const currentPrice = await DutchAuction.getPrice();
+    console.log(currentPrice);
 
-        await time.increaseTo(unlockTime);
+    const tokenBalance = await DutchAuction.getTokenBalance();
 
-        await expect(lock.withdraw())
-          .to.emit(lock, "Withdrawal")
-          .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-      });
-    });
+    const expectedTokenBalance = 1000 - Number(BigInt(10 ** 17) / currentPrice);
 
-    describe("Transfers", function () {
-      it("Should transfer the funds to the owner", async function () {
-        const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-          deployOneYearLockFixture
-        );
-
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw()).to.changeEtherBalances(
-          [owner, lock],
-          [lockedAmount, -lockedAmount]
-        );
-      });
-    });
+    expect(tokenBalance).to.equal(expectedTokenBalance);
   });
 });
